@@ -2,15 +2,28 @@ import dash
 import dash_core_components as dcc
 import dash_html_components as html
 from dash.dependencies import Output, State, Input
-import plotly.graph_objs as go
+from app_elements import app_elements as ae
+import dash_bootstrap_components as dbc
 import numpy as np
 from utilities import fractal_drawing as fd
 import time
+import json
 
-XMIN_DEFAULT = -2
-XMAX_DEFAULT = 0.5
-YMIN_DEFAULT = -1
-YMAX_DEFAULT = 1
+DEFAULT_AXES = {
+    'mandelbrot': {
+        'xmin': -2,
+        'xmax': 0.5,
+        'ymin': -1,
+        'ymax': 1,
+    },
+    'julia': {
+        'xmin': -2,
+        'xmax': 2,
+        'ymin': -2,
+        'ymax': 2,
+    }
+
+}
 
 styles = {
     'pre': {
@@ -19,85 +32,68 @@ styles = {
     }
 }
 
-app = dash.Dash()
-
+external_stylesheets = ["https://codepen.io/chriddyp/pen/bWLwgP.css", dbc.themes.SUPERHERO]
+app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 app.layout = html.Div([
     ################################################################################
     # Title
-    html.H2('Zoom Application',
-            style={
-                'position': 'relative',
-                'top': '0px',
-                'left': '10px',
-                'font-family': 'Dosis',
-                'display': 'inline',
-                'font-size': '4.0rem',
-                'color': '#4D637F'
-            }),
-    html.H2('for',
-            style={
-                'position': 'relative',
-                'top': '0px',
-                'left': '20px',
-                'font-family': 'Dosis',
-                'display': 'inline',
-                'font-size': '2.0rem',
-                'color': '#4D637F'
-            }),
-    html.H2('MandelBrot',
-            style={
-                'position': 'relative',
-                'top': '0px',
-                'left': '27px',
-                'font-family': 'Dosis',
-                'display': 'inline',
-                'font-size': '4.0rem',
-                'color': '#4D637F'
-            }),
-
+    ae.generate_title(),
     ################################################################################
     html.Br(),
-
-    html.Div([
-
-        dcc.Graph(
-            id='graph',
-            figure=fd.create_chart_from_matrix(*fd.mandelbrot_set(XMIN_DEFAULT, XMAX_DEFAULT, YMIN_DEFAULT, YMAX_DEFAULT))
-        ),
-
-        dcc.Slider(
-            id='iterations',
-            min=0,
-            max=500,
-            marks={int(val): {'label': str(int(val))} for val in np.linspace(0, 500, 11)},
-            value=250,
-        ),
-
-    ])
+    # charts in 2 columns
+    ae.charts_in_2_columns(DEFAULT_AXES),
 ])
 
 
 @app.callback(
-    Output('graph', 'figure'),
-    [Input('iterations', 'value'),
-     Input('graph', 'relayoutData')])
-def display_selected_data(iterations, relayoutData):
+    Output('mandelbrot_set', 'figure'),
+    [Input('iterations_mandelbrot', 'value'),
+     Input('mandelbrot_set', 'relayoutData')])
+def display_selected_data_mandelbrot(iterations, relayoutData):
     start = time.time()
 
     if relayoutData:
-        xmin = relayoutData['xaxis.range[0]']
-        xmax = relayoutData['xaxis.range[1]']
-        ymin = relayoutData['yaxis.range[0]']
-        ymax = relayoutData['yaxis.range[1]']
+        xmin = relayoutData.get('xaxis.range[0]', DEFAULT_AXES['mandelbrot']['xmin'])
+        xmax = relayoutData.get('xaxis.range[1]', DEFAULT_AXES['mandelbrot']['xmax'])
+        ymin = relayoutData.get('yaxis.range[0]', DEFAULT_AXES['mandelbrot']['ymin'])
+        ymax = relayoutData.get('yaxis.range[1]', DEFAULT_AXES['mandelbrot']['ymax'])
     else:
-        xmin=XMIN_DEFAULT
-        xmax=XMAX_DEFAULT
-        ymin=YMIN_DEFAULT
-        ymax=YMAX_DEFAULT
+        xmin = DEFAULT_AXES['mandelbrot']['xmin']
+        xmax = DEFAULT_AXES['mandelbrot']['xmax']
+        ymin = DEFAULT_AXES['mandelbrot']['ymin']
+        ymax = DEFAULT_AXES['mandelbrot']['xmax']
 
     fig = fd.create_chart_from_matrix(*fd.mandelbrot_set(xmin, xmax, ymin, ymax, maxiter=iterations))
     end = time.time()
     print(end - start)
+    return fig
+
+
+@app.callback(
+    Output('julia_set', 'figure'),
+    [Input('mandelbrot_set', 'clickData'),
+    Input('iterations_julia', 'value'),
+     Input('julia_set', 'relayoutData')])
+def display_click_data(clickData, iterations, relayoutData):
+    if clickData:
+        coords = clickData['points'][0]
+    else:
+        coords = {
+            'x': 0,
+            'y': 0,
+        }
+    if relayoutData:
+        xmin = relayoutData.get('xaxis.range[0]', DEFAULT_AXES['julia']['xmin'])
+        xmax = relayoutData.get('xaxis.range[1]', DEFAULT_AXES['julia']['xmax'])
+        ymin = relayoutData.get('yaxis.range[0]', DEFAULT_AXES['julia']['ymin'])
+        ymax = relayoutData.get('yaxis.range[1]', DEFAULT_AXES['julia']['ymax'])
+    else:
+        xmin = DEFAULT_AXES['julia']['xmin']
+        xmax = DEFAULT_AXES['julia']['xmax']
+        ymin = DEFAULT_AXES['julia']['ymin']
+        ymax = DEFAULT_AXES['julia']['ymax']
+
+    fig = fd.create_chart_from_matrix(*fd.julia_set(coords['x'] + 1j * coords['y'], xmin, xmax, ymin, ymax, iterations))
     return fig
 
 
